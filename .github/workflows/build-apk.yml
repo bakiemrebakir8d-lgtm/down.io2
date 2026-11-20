@@ -24,18 +24,36 @@ jobs:
         run: |
           mkdir extracted
           unzip -q develop-downio-android-app.zip -d extracted
+
           GRADLEW=$(find extracted -type f -name gradlew | head -n 1)
           if [ -z "$GRADLEW" ]; then
             echo "gradlew bulunamadi!"
             exit 1
           fi
-          echo "ANDROID_DIR=$(dirname "$GRADLEW")" >> $GITHUB_ENV
+
+          ANDROID_DIR=$(dirname "$GRADLEW")
+          echo "ANDROID_DIR=$ANDROID_DIR" >> $GITHUB_ENV
+
+          PROPERTIES="$ANDROID_DIR/gradle/wrapper/gradle-wrapper.properties"
+          if [ ! -f "$PROPERTIES" ]; then
+            echo "gradle-wrapper.properties bulunamadi!"
+            exit 1
+          fi
+
+          URL=$(grep '^distributionUrl=' "$PROPERTIES" | cut -d= -f2- | sed 's/\\:/:/g')
+          echo "GRADLE_URL=$URL" >> $GITHUB_ENV
+
+      - name: Install Gradle
+        run: |
+          wget -q "$GRADLE_URL" -O gradle.zip
+          unzip -q gradle.zip -d "$RUNNER_TEMP/gradle"
+          GRADLE=$(find "$RUNNER_TEMP/gradle" -type f -path '*/bin/gradle' | head -n 1)
+          echo "GRADLE=$GRADLE" >> $GITHUB_ENV
 
       - name: Build APK
         run: |
           cd "$ANDROID_DIR"
-          chmod +x gradlew
-          ./gradlew assembleDebug
+          "$GRADLE" assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
